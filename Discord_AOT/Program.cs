@@ -35,6 +35,11 @@ discord.ButtonExecuted += async c =>
             await ProcessRandomMessage(c);
             break;
         }
+        case not null when c.Data.CustomId.StartsWith("bftp:share"):
+        {
+            await ProcessMessage(c, AttachmentItem.FromBase64(c.Data.CustomId.Split(":")[2]), ephemeral: false);
+            break;
+        }
     }
 };
 discord.SlashCommandExecuted += async command =>
@@ -84,6 +89,54 @@ await discord.StartAsync();
 await Task.Delay(-1);
 return;
 
+async Task ProcessMessage(SocketInteraction interaction, AttachmentItem item, bool ephemeral = true)
+{
+    var message = await interaction.Channel.GetMessageAsync(item.MessageId);
+    if (message == null)
+    {
+        await interaction.RespondAsync("Message not found!", ephemeral: true);
+        return;
+    }
+
+    var replyEmbed = new EmbedBuilder()
+        .WithAuthor(message.Author)
+        .WithTimestamp(message.Timestamp)
+        .WithUrl(
+            $"https://discord.com/channels/{interaction.GuildId}/{item.ChannelId}/{item.MessageId}");
+    var component = new ComponentBuilder()
+        .WithButton("Jump!", style: ButtonStyle.Link, url:
+            $"https://discord.com/channels/{interaction.GuildId}/{item.ChannelId}/{item.MessageId}")
+        .WithButton("More please!", "bftp:generate", style: ButtonStyle.Success, emote: Emote.Parse("<a:Vbongo:971453554076299294>"));
+    if (ephemeral) component.WithButton("Share!", $"bftp:share:{item.ToBase64()}", emote: Emote.Parse("<a:snappi_coffee:1249258418946969650>"));
+
+    if (item.AttachmentId > 1000)
+    {
+        // Attachment
+        var attachment = message.Attachments.First(a => a.Id == item.AttachmentId);
+        await interaction.RespondAsync(
+            embed: replyEmbed
+                .WithTitle(attachment.Filename)
+                .WithImageUrl(attachment.Url)
+                .WithFooter(attachment.ContentType)
+                .Build(),
+            ephemeral: ephemeral,
+            components: component.Build());
+    }
+    else
+    {
+        // Embed
+        var embed = message.Embeds.ElementAt((int)item.AttachmentId);
+        await interaction.RespondAsync(
+            embed: replyEmbed
+                .WithTitle(embed.Title)
+                .WithImageUrl(EmbedTools.GetUrl(embed)!.ToString())
+                .WithFooter(embed.Type.ToString())
+                .Build(),
+            ephemeral: ephemeral,
+            components: component.Build());
+    }
+}
+
 async Task ProcessRandomMessage(SocketInteraction interaction)
 {
     var count = Directory.EnumerateFiles($"images/{interaction.ChannelId!.Value}").Count();
@@ -99,45 +152,11 @@ async Task ProcessRandomMessage(SocketInteraction interaction)
         var messageId = ulong.Parse(parts[0]);
         var attachmentId = ulong.Parse(parts[1]);
 
-        var message = await interaction.Channel.GetMessageAsync(messageId);
-        if (message == null)
+        if (await interaction.Channel.GetMessageAsync(messageId) == null)
             continue;
 
-        var replyEmbed = new EmbedBuilder()
-            .WithAuthor(message.Author)
-            .WithTimestamp(message.Timestamp)
-            .WithUrl(
-                $"https://discord.com/channels/{interaction.GuildId}/{interaction.ChannelId}/{messageId}");
-        var component = new ComponentBuilder()
-            .WithButton("Jump!", style: ButtonStyle.Link, url:
-                $"https://discord.com/channels/{interaction.GuildId}/{interaction.ChannelId}/{messageId}")
-            .WithButton("More please! <3", "bftp:generate", style: ButtonStyle.Success);
-
-        if (attachmentId > 1000)
-        {
-            // Attachment
-            var attachment = message.Attachments.First(a => a.Id == attachmentId);
-            await interaction.RespondAsync(
-                embed: replyEmbed
-                    .WithTitle(attachment.Filename)
-                    .WithImageUrl(attachment.Url)
-                    .WithFooter(attachment.ContentType)
-                    .Build(),
-                ephemeral: true,
-                components: component.Build());
-        }
-        else
-        {
-            // Embed
-            var embed = message.Embeds.ElementAt((int)attachmentId);
-            await interaction.RespondAsync(embed: replyEmbed
-                    .WithTitle(embed.Title)
-                    .WithImageUrl(EmbedTools.GetUrl(embed)!.ToString())
-                    .WithFooter(embed.Type.ToString())
-                    .Build(), ephemeral: true,
-                components: component.Build());
-        }
-
+        await ProcessMessage(interaction, new AttachmentItem
+            { ChannelId = interaction.ChannelId.Value, MessageId = messageId, AttachmentId = attachmentId });
 
         break;
     }
