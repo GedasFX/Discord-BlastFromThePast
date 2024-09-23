@@ -1,7 +1,3 @@
 **/bin/
 **/obj/
-**/.idea/
-
-**/google.json
-**/*.db
-**/*.user
+**/config.json
