@@ -1,11 +1,11 @@
-﻿# syntax=docker/dockerfile:1.7-labs
+# syntax=docker/dockerfile:1-labs
 
 # https://hub.docker.com/_/microsoft-dotnet
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /source
 
 COPY --parents ./src/**/*.csproj .
-RUN dotnet restore src/BlastFromThePast
+RUN dotnet restore src/BlastFromThePast -r linux-x64
 
 # copy everything else and build app
 COPY --parents ./src/**/ .
