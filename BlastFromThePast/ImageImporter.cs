@@ -2,7 +2,7 @@
 using Discord;
 using Discord.WebSocket;
 
-namespace Discord_AOT;
+namespace BlastFromThePast;
 
 public static class EmbedTools
 {

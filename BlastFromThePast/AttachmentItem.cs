@@ -1,4 +1,4 @@
-﻿namespace Discord_AOT;
+﻿namespace BlastFromThePast;
 
 public readonly struct AttachmentItem
 {

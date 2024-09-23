@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Discord_AOT;
+namespace BlastFromThePast;
 
 public class BotConfig
 {

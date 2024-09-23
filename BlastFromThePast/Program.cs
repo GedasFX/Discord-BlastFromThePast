@@ -1,5 +1,5 @@
-﻿using Discord;
-using Discord_AOT;
+﻿using BlastFromThePast;
+using Discord;
 using Discord.WebSocket;
 
 var discord = new DiscordSocketClient(new DiscordSocketConfig()

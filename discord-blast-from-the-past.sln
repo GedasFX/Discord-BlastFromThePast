@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord_AOT", "Discord_AOT\Discord_AOT.csproj", "{457B7B68-1C48-4DBA-BFEB-60861EFA41FD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlastFromThePast", "BlastFromThePast\BlastFromThePast.csproj", "{457B7B68-1C48-4DBA-BFEB-60861EFA41FD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
