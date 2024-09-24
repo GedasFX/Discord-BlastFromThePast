@@ -15,4 +15,4 @@ RUN dotnet publish -c Release -o /app --no-restore -r linux-x64 --self-contained
 FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-noble-chiseled-extra
 WORKDIR /app
 COPY --from=build /app .
-ENTRYPOINT ["dotnet", "BlastFromThePast.dll"]
+ENTRYPOINT ["./BlastFromThePast"]
