@@ -58,11 +58,20 @@ discord.SlashCommandExecuted += async command =>
 
                 _ = Task.Run(async () =>
                 {
-                    using var importer = new ImageImporter(discord.GetGuild(BotConfig.Instance.GuildId)
-                        .GetTextChannel(command.ChannelId!.Value));
-                    await importer.ImportAsync();
+                    try
+                    {
+                        using var importer = new ImageImporter(discord.GetGuild(BotConfig.Instance.GuildId)
+                            .GetTextChannel(command.ChannelId!.Value));
+                        await importer.ImportAsync();
 
-                    await command.FollowupAsync("Import complete!", ephemeral: true);
+                        await command.FollowupAsync("Import complete!", ephemeral: true);
+                    }
+                    catch (Exception e)
+                    {
+                        await command.FollowupAsync("Import failed!", ephemeral: true);
+                        await Console.Out.WriteLineAsync(
+                            $"{LogSeverity.Error:G} Error occured while performing import\n{e}");
+                    }
                 });
 
                 break;
