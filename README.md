@@ -20,7 +20,7 @@ Posts the same image to the channel for everyone to see.
 
 ### Save [ephmerial only]
 
-Sends the image to the DMs, additionally with the command `/btfp show by-id` instructions for recreation.
+Sends the image to the DMs.
 
 ## Usage - Commands
 
@@ -36,33 +36,17 @@ Scans the specified channel for images (starts all the way at the beginning of t
 
 Displays a random image which was indexed by `/btfp import`.
 
-### `/btfp show by-id <uuid> [channel_id {default: current_channel_id}]`
-
-Displays a requested image, output is the same as of `/btft show random` except it is not random.
-
-### `/btfp config scheduled-posts [enabled {default: false}] [schedule {default: '0 * * * *'}] [channel_id {default: current_channel_id}]`
-
-> Requires Admin Permissions.
-
-Enables/disables scheduled messages and configures the schedule. Configured via [CRON expression](https://crontab.guru), time is in UTC.
-
-### `/btfp config scheduled-import [enabled {default: false}] [schedule {default: '0 * * * *'}] [channel_id {default: current_channel_id}]`
-
-> Requires Admin Permissions.
-
-Enables/disables scheduled `/btfp import` and configures the schedule. Configured via [CRON expression](https://crontab.guru), time is in UTC.
-
 ## Usage - Message Components
 
 Message components can be accessed by right-clicking a messagage and navigating to `Apps` section in the dropdown.
 
 ### Apps -> BFTP: Share
 
-Equivalent to `/btfp show by-id` + `Share`, but uuid is taken from the message its trying to share. If a message has multiple images, it will take the first one.
+Creates a new blast from the image and shares it in the channel. Equivalent to the Share component.
 
 ### Apps -> BFTP: Save
 
-Equivalent to `/btfp show by-id` + `Save`, but uuid is taken from the message its trying to share. If a message has multiple images, it will take the first one.
+Creates a new blast from the image and saves in DMs. Equivalent to the Save component.
 
 ## Usage - Archival
 
@@ -91,6 +75,6 @@ sudo chown 1654:1654 ./data
 
 ## Privacy Notice
 
-The bot locally stores `guild_id`, `message_id`, and `attachment_id` of every message with images. It is not enough to reconstruct the images without the bots presence.
+The bot locally stores `guild_id`, `channel_id`, `message_id`, and `attachment_id` of every message with images. It is not enough to reconstruct the images without the bots presence.
 
 All data gets deleted after bot is removed from the Discord Server.
