@@ -1,6 +1,8 @@
 ﻿using System.Web;
+using BlastFromThePast.Data;
+using BlastFromThePast.Data.Models;
 using Discord;
-using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlastFromThePast;
 
@@ -26,37 +28,60 @@ public static class EmbedTools
     }
 }
 
-public class ImageImporter(SocketTextChannel channel) : IDisposable
+public class ImageImporter(HttpClient httpClient, AppDbContext dbContext)
 {
-    public HttpClient HttpClient { get; } = new();
-
-    public async Task ImportAsync()
+    public async Task ImportAsync(ulong guildId, IMessageChannel channel, bool saveFiles = false)
     {
-        Directory.CreateDirectory($"images/{channel.Id}");
+        if (saveFiles)
+            Directory.CreateDirectory($"images/{channel.Id}");
 
-        var f = Directory.EnumerateFiles($"images/{channel.Id}").LastOrDefault();
-        var fromId = !string.IsNullOrEmpty(f) ? ulong.Parse(new FileInfo(f).Name.Split('_')[0]) : 0;
+        var fromId = await dbContext.Items.AsNoTracking()
+            .Where(i => i.GuildId == guildId && i.ChannelId == channel.Id)
+            .OrderByDescending(i => (long)i.MessageId)
+            .Select(i => i.MessageId)
+            .FirstOrDefaultAsync();
 
-        await foreach (var message in channel.GetMessagesAsync(fromId, Direction.After, limit: 100000).Flatten())
+        var i = 0;
+        await foreach (var message in channel.GetMessagesAsync(fromId, Direction.After, limit: int.MaxValue).Flatten())
         {
             if (message.Attachments.Count == 0 && message.Embeds.Count == 0)
                 continue;
 
             foreach (var attachment in message.Attachments)
             {
-                await WriteFile(message.Id, attachment.Id, new Uri(attachment.Url));
+                dbContext.Items.Add(new AttachmentItem
+                {
+                    GuildId = guildId, ChannelId = channel.Id, MessageId = message.Id, AttachmentId = attachment.Id
+                });
+
+                if (saveFiles)
+                    await WriteFile(channel.Id, message.Id, attachment.Id, new Uri(attachment.Url));
             }
 
             var eId = 0u;
             foreach (var embed in message.Embeds)
             {
                 var url = EmbedTools.GetUrl(embed);
-                if (url != null) await WriteFile(message.Id, eId++, url);
+                if (url != null)
+                {
+                    dbContext.Items.Add(new AttachmentItem()
+                    {
+                        GuildId = guildId, ChannelId = channel.Id, MessageId = message.Id, AttachmentId = eId,
+                    });
+
+                    if (saveFiles)
+                        await WriteFile(channel.Id, message.Id, eId++, url);
+                }
             }
+
+            if (++i % 60 == 0)
+                await dbContext.SaveChangesAsync();
         }
+
+        await dbContext.SaveChangesAsync();
     }
 
-    private async Task WriteFile(ulong messageId, ulong attachmentId, Uri url)
+    private async Task WriteFile(ulong channelId, ulong messageId, ulong attachmentId, Uri url)
     {
         var fileName = url.Segments[^1];
 
@@ -78,27 +103,13 @@ public class ImageImporter(SocketTextChannel channel) : IDisposable
             };
         }
 
-        var path = $"images/{channel.Id}/{messageId}_{attachmentId}_{fileName}";
+        var path = $"images/{channelId}/{messageId}_{attachmentId}_{fileName}";
         if (File.Exists(path))
             return;
 
         await using var fStream = File.Open(path, FileMode.CreateNew, FileAccess.Write);
 
-        var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url));
+        var response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url));
         await response.Content.CopyToAsync(fStream);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            HttpClient.Dispose();
-        }
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 }
