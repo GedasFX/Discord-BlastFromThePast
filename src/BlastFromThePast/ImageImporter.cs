@@ -48,7 +48,7 @@ public static class EmbedTools
             {
                 yield return (new AttachmentItem()
                 {
-                    GuildId = guildId, ChannelId = message.Channel.Id, MessageId = message.Id, AttachmentId = eId,
+                    GuildId = guildId, ChannelId = message.Channel.Id, MessageId = message.Id, AttachmentId = eId++,
                 }, url);
             }
         }
