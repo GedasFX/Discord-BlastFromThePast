@@ -72,11 +72,10 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
                 return;
             }
 
-            var (embed, component) = GetEmbed(message, attachment.Attachment, inDms: true);
-            await RespondAsync("Attempting to send to DMs", ephemeral: true);
-            await Context.User.SendMessageAsync(
-                embed: embed.Build(),
-                components: component.Build());
+            var (embed, _) = GetEmbed(message, attachment.Attachment);
+
+            await RespondAsync("Sent image to DMs", ephemeral: true);
+            await Context.User.SendMessageAsync(embed: embed.Build());
         }
 
         private async Task ProcessRandom(IMessageChannel channel, bool ephemeral = true)
@@ -129,7 +128,7 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
         }
 
         private static (EmbedBuilder embed, ComponentBuilder component) GetEmbed(IMessage message,
-            AttachmentItem item, bool ephemeral = true, bool inDms = false)
+            AttachmentItem item, bool ephemeral = true)
         {
             var uuid = item.ToBase64();
 
@@ -137,22 +136,21 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
                 .WithAuthor(message.Author)
                 .WithTimestamp(message.Timestamp)
                 .WithUrl($"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}")
-                .AddField("Snatched it here:", $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}");
+                .AddField("Snatched it here:",
+                    $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}");
 
             var component = new ComponentBuilder()
                 .WithButton("Jump!", style: ButtonStyle.Link, url:
                     $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}");
 
-            if (!inDms)
+            component.WithButton("More please!", $"bftp:generate:{item.ChannelId}", style: ButtonStyle.Success,
+                emote: Emote.Parse("<a:Vbongo:971453554076299294>"));
+            if (ephemeral)
             {
-                component.WithButton("More please!", $"bftp:generate:{item.ChannelId}", style: ButtonStyle.Success,
-                    emote: Emote.Parse("<a:Vbongo:971453554076299294>"));
-                if (ephemeral)
-                {
-                    component.WithButton("Share!", $"bftp:share:{uuid}",
-                        emote: Emote.Parse("<a:snappi_coffee:1249258418946969650>"));
-                }
+                component.WithButton("Share!", $"bftp:share:{uuid}",
+                    emote: Emote.Parse("<a:snappi_coffee:1249258418946969650>"));
             }
+
 
             if (item.AttachmentId > 1000)
             {
