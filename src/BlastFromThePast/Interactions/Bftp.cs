@@ -30,12 +30,57 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
     public class Show : InteractionModuleBase<SocketInteractionContext>
     {
         [SlashCommand("random", "Display a random image.")]
-        public async Task Random(
+        public async Task ProcessRandomCommand(
             [Summary(description: "Channel to use. Default uses current channel.")]
             IMessageChannel? channel = null)
         {
-            channel ??= Context.Channel;
+            await ProcessRandom(channel ?? Context.Channel);
+        }
 
+        [ComponentInteraction("bftp:generate:*", ignoreGroupNames: true)]
+        public async Task ProcessRandomComponent(ulong channelId)
+        {
+            await ProcessRandom(Context.Guild.GetTextChannel(channelId));
+        }
+
+        [ComponentInteraction("bftp:share:*", ignoreGroupNames: true)]
+        public async Task ProcessShareComponent(string uuid)
+        {
+            await Process(AttachmentItem.FromBase64(uuid), ephemeral: false);
+        }
+
+        [MessageCommand("BFTP: Share")]
+        public async Task ProcessShareMessageCommand(IMessage message)
+        {
+            var attachment = message.GetAttachmentItems(Context.Guild.Id).FirstOrDefault();
+            if (attachment == default)
+            {
+                await RespondAsync("Message has no attachments", ephemeral: true);
+                return;
+            }
+
+            await Process(attachment.Attachment, ephemeral: false);
+        }
+
+        [MessageCommand("BFTP: Save")]
+        public async Task ProcessSaveMessageComponent(IMessage message)
+        {
+            var attachment = message.GetAttachmentItems(Context.Guild.Id).FirstOrDefault();
+            if (attachment == default)
+            {
+                await RespondAsync("Message has no attachments", ephemeral: true);
+                return;
+            }
+
+            var (embed, component) = GetEmbed(message, attachment.Attachment, inDms: true);
+            await RespondAsync("Attempting to send to DMs", ephemeral: true);
+            await Context.User.SendMessageAsync(
+                embed: embed.Build(),
+                components: component.Build());
+        }
+
+        private async Task ProcessRandom(IMessageChannel channel, bool ephemeral = true)
+        {
             while (true)
             {
                 AttachmentItem? item;
@@ -55,7 +100,7 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
 
                 try
                 {
-                    await Process(item);
+                    await Process(item, ephemeral);
                     return;
                 }
                 catch (MessageNotFoundException)
@@ -72,14 +117,6 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
             }
         }
 
-        [SlashCommand("by-id", "Display a specific image.")]
-        public async Task ById(
-            [Summary(description: "Unique image identifier.")]
-            string uuid)
-        {
-            await Process(AttachmentItem.FromBase64(uuid));
-        }
-
         private async Task Process(AttachmentItem item, bool ephemeral = true)
         {
             var message = await Context.Client.GetGuild(item.GuildId).GetTextChannel(item.ChannelId)
@@ -87,48 +124,56 @@ public class Bftp(IServiceProvider serviceProvider) : InteractionModuleBase<Sock
             if (message == null)
                 throw new MessageNotFoundException();
 
+            var (embed, component) = GetEmbed(message, item, ephemeral);
+            await RespondAsync(embed: embed.Build(), ephemeral: ephemeral, components: component.Build());
+        }
+
+        private static (EmbedBuilder embed, ComponentBuilder component) GetEmbed(IMessage message,
+            AttachmentItem item, bool ephemeral = true, bool inDms = false)
+        {
             var uuid = item.ToBase64();
 
             var replyEmbed = new EmbedBuilder()
                 .WithAuthor(message.Author)
                 .WithTimestamp(message.Timestamp)
-                .WithUrl(
-                    $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}")
-                .WithFooter(uuid);
+                .WithUrl($"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}")
+                .AddField("Snatched it here:", $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}");
 
             var component = new ComponentBuilder()
                 .WithButton("Jump!", style: ButtonStyle.Link, url:
-                    $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}")
-                .WithButton("More please!", "bftp:generate", style: ButtonStyle.Success,
+                    $"https://discord.com/channels/{item.GuildId}/{item.ChannelId}/{item.MessageId}");
+
+            if (!inDms)
+            {
+                component.WithButton("More please!", $"bftp:generate:{item.ChannelId}", style: ButtonStyle.Success,
                     emote: Emote.Parse("<a:Vbongo:971453554076299294>"));
-            if (ephemeral)
-                component.WithButton("Share!", $"bftp:share:{uuid}",
-                    emote: Emote.Parse("<a:snappi_coffee:1249258418946969650>"));
+                if (ephemeral)
+                {
+                    component.WithButton("Share!", $"bftp:share:{uuid}",
+                        emote: Emote.Parse("<a:snappi_coffee:1249258418946969650>"));
+                }
+            }
 
             if (item.AttachmentId > 1000)
             {
                 // Attachment
                 var attachment = message.Attachments.First(a => a.Id == item.AttachmentId);
-                await RespondAsync(
-                    embed: replyEmbed
+                return (
+                    replyEmbed
                         .WithTitle(attachment.Filename)
-                        .WithImageUrl(attachment.Url)
-                        .Build(),
-                    ephemeral: ephemeral,
-                    components: component.Build());
+                        .WithFooter(attachment.ContentType)
+                        .WithImageUrl(attachment.Url),
+                    component);
             }
-            else
-            {
-                // Embed
-                var embed = message.Embeds.ElementAt((int)item.AttachmentId);
-                await RespondAsync(
-                    embed: replyEmbed
-                        .WithTitle(embed.Title)
-                        .WithImageUrl(EmbedTools.GetUrl(embed)!.ToString())
-                        .Build(),
-                    ephemeral: ephemeral,
-                    components: component.Build());
-            }
+
+            // Embed
+            var embed = message.Embeds.ElementAt((int)item.AttachmentId);
+            return (
+                replyEmbed
+                    .WithTitle(new Uri(embed.Url).Authority)
+                    .WithFooter(embed.Type.ToString())
+                    .WithImageUrl(EmbedTools.GetUrl(embed)!.ToString()),
+                component);
         }
     }
 }

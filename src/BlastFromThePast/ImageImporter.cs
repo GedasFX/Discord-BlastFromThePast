@@ -22,8 +22,35 @@ public static class EmbedTools
             case EmbedType.Video:
             case EmbedType.Gifv when embed.Provider is { Name: not "Tenor" }:
                 return new Uri(embed.Video!.Value.Url);
+            case EmbedType.Rich when embed.Image is not null:
+                return new Uri(embed.Image.Value.Url);
             default:
                 return null;
+        }
+    }
+
+    public static IEnumerable<(AttachmentItem Attachment, Uri Uri)> GetAttachmentItems(this IMessage message,
+        ulong guildId)
+    {
+        foreach (var attachment in message.Attachments)
+        {
+            yield return (new AttachmentItem
+            {
+                GuildId = guildId, ChannelId = message.Channel.Id, MessageId = message.Id, AttachmentId = attachment.Id
+            }, new Uri(attachment.Url));
+        }
+
+        var eId = 0u;
+        foreach (var embed in message.Embeds)
+        {
+            var url = GetUrl(embed);
+            if (url != null)
+            {
+                yield return (new AttachmentItem()
+                {
+                    GuildId = guildId, ChannelId = message.Channel.Id, MessageId = message.Id, AttachmentId = eId,
+                }, url);
+            }
         }
     }
 }
@@ -47,35 +74,16 @@ public class ImageImporter(HttpClient httpClient, AppDbContext dbContext)
             if (message.Attachments.Count == 0 && message.Embeds.Count == 0)
                 continue;
 
-            foreach (var attachment in message.Attachments)
+            foreach (var (attachment, url) in message.GetAttachmentItems(guildId))
             {
-                dbContext.Items.Add(new AttachmentItem
-                {
-                    GuildId = guildId, ChannelId = channel.Id, MessageId = message.Id, AttachmentId = attachment.Id
-                });
+                dbContext.Items.Add(attachment);
 
                 if (saveFiles)
-                    await WriteFile(channel.Id, message.Id, attachment.Id, new Uri(attachment.Url));
+                    await WriteFile(channel.Id, message.Id, attachment.AttachmentId, url);
+
+                if (++i % 60 == 0)
+                    await dbContext.SaveChangesAsync();
             }
-
-            var eId = 0u;
-            foreach (var embed in message.Embeds)
-            {
-                var url = EmbedTools.GetUrl(embed);
-                if (url != null)
-                {
-                    dbContext.Items.Add(new AttachmentItem()
-                    {
-                        GuildId = guildId, ChannelId = channel.Id, MessageId = message.Id, AttachmentId = eId,
-                    });
-
-                    if (saveFiles)
-                        await WriteFile(channel.Id, message.Id, eId++, url);
-                }
-            }
-
-            if (++i % 60 == 0)
-                await dbContext.SaveChangesAsync();
         }
 
         await dbContext.SaveChangesAsync();

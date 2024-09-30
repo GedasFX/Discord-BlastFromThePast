@@ -11,43 +11,6 @@ var discord = new DiscordSocketClient(new DiscordSocketConfig()
     GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent
 });
 
-// discord.Ready += async () =>
-// {
-//     var command = new SlashCommandBuilder()
-//         .WithName("bftp")
-//         .WithDescription("Blast From The Past")
-//         .AddOption(new SlashCommandOptionBuilder()
-//             .WithType(ApplicationCommandOptionType.SubCommand)
-//             .WithName("import")
-//             .WithDescription("Import Images from the current channel"))
-//         .AddOption(new SlashCommandOptionBuilder()
-//             .WithType(ApplicationCommandOptionType.SubCommand)
-//             .WithName("random")
-//             .WithDescription("Display a random thing from the past"))
-//         .Build();
-//
-//     var guild = discord.GetGuild(BotConfig.Instance.GuildId);
-//     await guild.CreateApplicationCommandAsync(command);
-// };
-
-discord.ButtonExecuted += async c =>
-{
-    switch (c.Data.CustomId)
-    {
-        // case "bftp:generate":
-        // {
-        //     await ProcessRandomMessage(c);
-        //     break;
-        // }
-        // case not null when c.Data.CustomId.StartsWith("bftp:share"):
-        // {
-        //     await ProcessMessage(c, AttachmentItem.FromBase64(c.Data.CustomId.Split(":")[2]), ephemeral: false);
-        //     break;
-        // }
-    }
-};
-
-
 var serviceProvider = new ServiceCollection()
     .AddSingleton(discord)
     .AddDbContext<AppDbContext>()
@@ -61,15 +24,26 @@ await service.AddModulesAsync(typeof(Program).Assembly, serviceProvider);
 service.Log += Log;
 discord.Log += Log;
 
-discord.Ready += async () => { await service.RegisterCommandsToGuildAsync(896045547641798667); };
+discord.Ready += async () =>
+{
+#if DEBUG
+    await service.RegisterCommandsToGuildAsync(896045547641798667);
+#else
+    await service.RegisterCommandsGloballyAsync();
+#endif
+};
 
 service.InteractionExecuted += async (_, context, result) =>
 {
     if (result.IsSuccess)
         return;
 
-    await context.Interaction.FollowupAsync($"Fail: {result.Error} - {result.ErrorReason}",
-        ephemeral: true);
+    if (context.Interaction.HasResponded)
+        await context.Interaction.FollowupAsync($"Fail: {result.Error} - {result.ErrorReason}",
+            ephemeral: true);
+    else
+        await context.Interaction.RespondAsync($"Fail: {result.Error} - {result.ErrorReason}",
+            ephemeral: true);
 };
 
 discord.InteractionCreated += async x =>
